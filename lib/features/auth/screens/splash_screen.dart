@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 
@@ -27,7 +28,10 @@ class _SplashScreenState extends State<SplashScreen> {
           _progress += 0.02;
         } else {
           _timer.cancel();
-          context.go('/onboarding');
+          if (!mounted) return;
+          final hasSession =
+              Supabase.instance.client.auth.currentSession != null;
+          context.go(hasSession ? '/home' : '/onboarding');
         }
       });
     });

@@ -2,21 +2,51 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/platform_utils.dart';
+import '../../../core/services/secure_storage_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _dailyReminder = true;
   bool _newArrivals = true;
   bool _autoTranslate = true;
   bool _zenMode = false;
   double _typographyScale = 18.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final secureStorage = ref.read(secureStorageServiceProvider);
+    final daily = await secureStorage.read('daily_reminder');
+    final arrivals = await secureStorage.read('new_arrivals');
+    final typography = await secureStorage.read('typography_scale');
+    
+    if (mounted) {
+      setState(() {
+        if (daily != null) _dailyReminder = daily == 'true';
+        if (arrivals != null) _newArrivals = arrivals == 'true';
+        if (typography != null) _typographyScale = double.tryParse(typography) ?? 18.0;
+      });
+    }
+  }
+
+  Future<void> _saveSetting(String key, String value) async {
+    await ref.read(secureStorageServiceProvider).write(key, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,9 +119,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: GoogleFonts.inter(color: Colors.white38, fontSize: 11),
                 ),
                 const SizedBox(height: 16),
-                _buildCheckboxTile('Daily Reminder', _dailyReminder, (v) => setState(() => _dailyReminder = v!)),
+                _buildCheckboxTile('Daily Reminder', _dailyReminder, (v) {
+                  setState(() {
+                    _dailyReminder = v!;
+                  });
+                  _saveSetting('daily_reminder', v.toString());
+                  if (v == true) {
+                    ref.read(notificationServiceProvider).scheduleDailyReminder();
+                  } else {
+                    ref.read(notificationServiceProvider).cancelDailyReminder();
+                  }
+                }),
                 const SizedBox(height: 10),
-                _buildCheckboxTile('New Arrivals', _newArrivals, (v) => setState(() => _newArrivals = v!)),
+                _buildCheckboxTile('New Arrivals', _newArrivals, (v) => setState(() { _newArrivals = v!; _saveSetting('new_arrivals', v.toString()); })),
 
                 const SizedBox(height: 24),
 
@@ -311,7 +351,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             max: 32,
             activeColor: const Color(0xFFFFD700),
             inactiveColor: Colors.white.withOpacity(0.05),
-            onChanged: (v) => setState(() => _typographyScale = v),
+            onChanged: (v) => setState(() {
+              _typographyScale = v;
+              _saveSetting('typography_scale', v.toString());
+            }),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -434,7 +477,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () {
+              if (isMobilePlatform) {
+                FirebaseAnalytics.instance.logEvent(
+                  name: 'gift_a_coffee_clicked',
+                  parameters: {
+                    'timestamp': DateTime.now().toIso8601String(),
+                    'support_type': 'coffee',
+                  },
+                );
+              }
+              
+              // Show on-screen feedback
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('❤️ Thank you! Event "gift_a_coffee_clicked" logged to Firebase!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
             icon: const Icon(Icons.favorite, size: 16),
             label: const Text('Gift a Coffee', style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(

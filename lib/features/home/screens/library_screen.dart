@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/providers/service_providers.dart';
+import '../../../core/utils/book_mapper.dart';
 import '../../../core/theme/app_colors.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
@@ -128,71 +130,110 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-            // Reading List
+            // Reading list from Supabase
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildReadingCard(
-                    'The Midnight Library',
-                    'Matt Haig',
-                    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400',
-                    0.64,
-                    ['FICTION', 'PHILOSOPHICAL'],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildReadingCard(
-                    'Stardust Rituals',
-                    'Elena Thorne',
-                    'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400',
-                    0.12,
-                    ['FANTASY', 'POETRY'],
-                  ),
-                  const SizedBox(height: 16),
-                  // "Add new book" Section from Screenshot 2
-                  _buildAddNewBookDashed(),
-                  const SizedBox(height: 32),
-                  
-                  // Recently Visited Shelves Header
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Recently Visited Shelves',
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Shelves Grid
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.1, // Adjusted from 1.4 to fix bottom overflow
-                    children: [
-                      _buildShelfCard('Classic Literature', '12 TITLES', Icons.history_edu),
-                      _buildShelfCard('Philosophy', '8 TITLES', Icons.psychology_outlined),
-                      _buildShelfCard('Fantasy Quest', '24 TITLES', Icons.menu_book),
-                      _buildShelfCard('Morning Reads', '5 TITLES', Icons.coffee),
-                    ],
-                  ),
-                  const SizedBox(height: 100),
-                ]),
+                delegate: SliverChildListDelegate(
+                  _buildLibraryContent(ref),
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  List<Widget> _buildLibraryContent(WidgetRef ref) {
+    final booksAsync = ref.watch(booksProvider);
+
+    return booksAsync.when(
+      loading: () => [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+          ),
+        ),
+      ],
+      error: (error, _) => [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'Could not load your library from Supabase.',
+            style: GoogleFonts.inter(color: Colors.white38, fontSize: 12),
+          ),
+        ),
+        _buildAddNewBookDashed(),
+        const SizedBox(height: 100),
+      ],
+      data: (books) {
+        final widgets = <Widget>[];
+
+        if (books.isEmpty) {
+          widgets.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'No books yet. Add rows to the `books` table in Supabase.',
+                style: GoogleFonts.inter(color: Colors.white38, fontSize: 12),
+              ),
+            ),
+          );
+        } else {
+          for (final book in books) {
+            widgets.add(
+              _buildReadingCard(
+                bookTitle(book),
+                bookAuthor(book),
+                bookCoverUrl(book),
+                bookProgress(book),
+                bookTags(book),
+              ),
+            );
+            widgets.add(const SizedBox(height: 16));
+          }
+        }
+
+        widgets.addAll([
+          _buildAddNewBookDashed(),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Row(
+              children: [
+                Text(
+                  'Recently Visited Shelves',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.1,
+            children: [
+              _buildShelfCard('Classic Literature', '12 TITLES', Icons.history_edu),
+              _buildShelfCard('Philosophy', '8 TITLES', Icons.psychology_outlined),
+              _buildShelfCard('Fantasy Quest', '24 TITLES', Icons.menu_book),
+              _buildShelfCard('Morning Reads', '5 TITLES', Icons.coffee),
+            ],
+          ),
+          const SizedBox(height: 100),
+        ]);
+
+        return widgets;
+      },
     );
   }
 

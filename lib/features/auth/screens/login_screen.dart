@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase for AuthException
 import '../../../core/providers/service_providers.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -29,8 +30,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'An unexpected error occurred. Please try again.';
+        
+        if (e is AuthException) {
+          final message = e.message.toLowerCase();
+          if (message.contains('invalid login credentials') || e.statusCode == '400') {
+            errorMessage = 'Invalid email or password. Please verify your credentials.';
+          } else if (message.contains('email not confirmed')) {
+            errorMessage = 'Your email address is not verified. Please check your inbox or turn off email confirmation.';
+          } else if (message.contains('rate limit')) {
+            errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+          } else {
+            errorMessage = e.message;
+          }
+        } else {
+          errorMessage = e.toString();
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: ${e.toString()}')),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    errorMessage,
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -144,23 +179,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         style: GoogleFonts.inter(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Forgot Password
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: () => context.push('/forgot-password'),
-                    child: Text(
-                      'Forgot Password?',
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFFFFD700),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 32),

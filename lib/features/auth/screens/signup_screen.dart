@@ -43,7 +43,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       
       if (mounted) {
         setState(() => _isLoading = false);
-        context.push('/otp');
+        context.go('/home');
       }
     } catch (e) {
       if (mounted) {

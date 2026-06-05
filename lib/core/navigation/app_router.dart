@@ -1,10 +1,10 @@
 import 'package:go_router/go_router.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import '../utils/platform_utils.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
-import '../../features/auth/screens/forgot_password_screen.dart';
-import '../../features/auth/screens/otp_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
 import '../../features/books/screens/book_detail_screen.dart';
 import '../../features/books/screens/reading_screen.dart';
@@ -19,6 +19,10 @@ import '../../features/home/screens/profile_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
+  observers: [
+    if (isMobilePlatform)
+      FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
+  ],
   routes: [
     GoRoute(
       path: '/',
@@ -35,14 +39,6 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/signup',
       builder: (context, state) => const SignUpScreen(),
-    ),
-    GoRoute(
-      path: '/forgot-password',
-      builder: (context, state) => const ForgotPasswordScreen(),
-    ),
-    GoRoute(
-      path: '/otp',
-      builder: (context, state) => const OtpScreen(),
     ),
     GoRoute(
       path: '/home',

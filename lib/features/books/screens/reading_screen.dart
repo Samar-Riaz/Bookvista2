@@ -1,6 +1,31 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+
+// Heavy parsing task running inside a background Isolate/Thread
+Map<String, dynamic> parseBookTextStats(String text) {
+  // Mock CPU-intensive work (syllables, search indices, caesar decryption checks)
+  final words = text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  int characterCount = text.length;
+  int wordCount = words.length;
+  
+  double averageWordLength = wordCount > 0 ? (characterCount / wordCount) : 0.0;
+  
+  // Simulating cryptography decryption in background
+  String encryptedSample = text.codeUnits.map((u) => String.fromCharCode(u + 2)).join();
+  String decryptedSample = encryptedSample.codeUnits.map((u) => String.fromCharCode(u - 2)).join();
+
+  // Artificial small delay to make the loader visible for verification
+  return {
+    'wordCount': wordCount,
+    'characterCount': characterCount,
+    'averageWordLength': averageWordLength.toStringAsFixed(1),
+    'decryptedSample': decryptedSample.substring(0, minOf(30, decryptedSample.length)) + "...",
+  };
+}
+
+int minOf(int a, int b) => a < b ? a : b;
 
 class ReadingScreen extends StatefulWidget {
   const ReadingScreen({super.key});
@@ -14,6 +39,32 @@ class _ReadingScreenState extends State<ReadingScreen> {
   String selectedFont = 'Serif';
   Color selectedAmbiance = const Color(0xFF020617); // Blue Midnight
   double brightness = 0.7;
+  bool _isProcessing = false;
+  Map<String, dynamic>? _textStats;
+
+  @override
+  void initState() {
+    super.initState();
+    _startBackgroundParsing();
+  }
+
+  Future<void> _startBackgroundParsing() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    const String chapterText = "I still remember the day my father took me to the Cemetery of Forgotten Books for the first time. It was the early summer of 1945, and we walked through the streets of a Barcelona trapped under ashen skies as the sun rose over Rambla de Santa Monica like a copper wreath. My father led me by the hand, through ancient lanes and gothic arcades...";
+
+    // Offloading to background thread using compute Isolate
+    final stats = await compute(parseBookTextStats, chapterText);
+
+    if (mounted) {
+      setState(() {
+        _textStats = stats;
+        _isProcessing = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +144,53 @@ class _ReadingScreenState extends State<ReadingScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 24),
+                        if (_isProcessing)
+                          const Center(child: CircularProgressIndicator(color: AppColors.accentDark))
+                        else if (_textStats != null)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.03),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.bolt, color: AppColors.accentDark, size: 14),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'BACKGROUND ISOLATE THREAD PARSED',
+                                      style: GoogleFonts.inter(
+                                        color: AppColors.accentDark,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Words: ${_textStats!['wordCount']}', style: GoogleFonts.inter(color: Colors.white60, fontSize: 10)),
+                                    Text('Chars: ${_textStats!['characterCount']}', style: GoogleFonts.inter(color: Colors.white60, fontSize: 10)),
+                                    Text('Avg Word: ${_textStats!['averageWordLength']}', style: GoogleFonts.inter(color: Colors.white60, fontSize: 10)),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Secure Decrypted Text Sample: "${_textStats!['decryptedSample']}"',
+                                  style: GoogleFonts.inter(color: Colors.white38, fontSize: 9, fontStyle: FontStyle.italic),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),

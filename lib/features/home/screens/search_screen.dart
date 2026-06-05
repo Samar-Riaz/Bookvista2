@@ -5,6 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/service_providers.dart';
+import '../../../core/services/open_library_service.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -15,6 +17,14 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   bool isBooksSelected = true;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,12 +94,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     border: Border.all(color: Colors.white10),
                   ),
                   child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v),
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                     decoration: InputDecoration(
                       prefixIcon: const Padding(
                         padding: EdgeInsets.all(10.0),
                         child: Icon(Icons.search, color: Colors.white38, size: 16),
                       ),
+                      suffixIcon: _searchQuery.isNotEmpty 
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.white38, size: 16),
+                            onPressed: () => setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            }),
+                          )
+                        : null,
                       hintText: 'Search titles, authors, or genres...',
                       hintStyle: GoogleFonts.inter(color: Colors.white24, fontSize: 12),
                       border: InputBorder.none,
@@ -158,114 +179,228 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
 
-            // Explore Genres
-            SliverToBoxAdapter(
-              child: Padding(
+            if (_searchQuery.isNotEmpty) ...[
+              // Local Results from Supabase
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Local Collection (Supabase)',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFFFFD700),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      FutureBuilder<List<Map<String, dynamic>>>(
+                        future: ref.read(bookServiceProvider).searchBooks(_searchQuery),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+                            ));
+                          }
+                          if (snapshot.hasError || snapshot.data == null || snapshot.data!.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'No local books found matching "$_searchQuery".',
+                                style: GoogleFonts.inter(color: Colors.white38, fontSize: 12),
+                              ),
+                            );
+                          }
+                          return Column(
+                            children: snapshot.data!.map((book) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _buildRecentReadTile(
+                                  context,
+                                  book['title'] ?? 'Untitled',
+                                  book['author'] ?? 'Unknown',
+                                  book['cover_url'] ?? 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=200',
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Global Results from Open Library API (REST API)
+              SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Explore Genres',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Global Catalog (Open Library API)',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFFFFD700),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _buildGenreChip('Classic Lit', isSelected: true),
-                        _buildGenreChip('Mysticism'),
-                        _buildGenreChip('Philosophy'),
-                        _buildGenreChip('Poetry'),
-                        _buildGenreChip('Dark Academia'),
-                        _buildGenreChip('Folklore'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Recent Reads
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Recent Reads',
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      const SizedBox(height: 12),
+                      ref.watch(externalSearchProvider(_searchQuery)).when(
+                        data: (books) {
+                          if (books.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'No global books found matching "$_searchQuery".',
+                                style: GoogleFonts.inter(color: Colors.white38, fontSize: 12),
+                              ),
+                            );
+                          }
+                          return Column(
+                            children: books.map((book) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _buildRecentReadTile(
+                                  context,
+                                  book.title,
+                                  book.author,
+                                  book.coverUrl ?? 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=200',
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                        loading: () => const Center(child: Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+                        )),
+                        error: (err, stack) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'Error loading global results.',
+                            style: GoogleFonts.inter(color: Colors.redAccent, fontSize: 12),
                           ),
                         ),
-                        Text(
-                          'CLEAR ALL',
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFFFFD700),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRecentReadTile(
-                      context,
-                      'The Alchemist',
-                      'Paulo Coelho',
-                      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildRecentReadTile(
-                      context,
-                      'Meditations',
-                      'Marcus Aurelius',
-                      'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildRecentReadTile(
-                      context,
-                      'Kafka on the Shore',
-                      'Haruki Murakami',
-                      'https://images.unsplash.com/photo-1506466010722-395aa2bef877?w=400',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Curated Section
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Curated for Night Owls',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCuratedBanner(),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ] else ...[
+              // Explore Genres
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Explore Genres',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _buildGenreChip('Classic Lit', isSelected: true),
+                          _buildGenreChip('Mysticism'),
+                          _buildGenreChip('Philosophy'),
+                          _buildGenreChip('Poetry'),
+                          _buildGenreChip('Dark Academia'),
+                          _buildGenreChip('Folklore'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Recent Reads
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Recent Reads',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'CLEAR ALL',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFFFD700),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildRecentReadTile(
+                        context,
+                        'The Alchemist',
+                        'Paulo Coelho',
+                        'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildRecentReadTile(
+                        context,
+                        'Meditations',
+                        'Marcus Aurelius',
+                        'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildRecentReadTile(
+                        context,
+                        'Kafka on the Shore',
+                        'Haruki Murakami',
+                        'https://images.unsplash.com/photo-1506466010722-395aa2bef877?w=400',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Curated Section
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Curated for Night Owls',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCuratedBanner(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
 
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],

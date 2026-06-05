@@ -1,19 +1,32 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/permission_service.dart';
 
-class WriterUploadScreen extends StatefulWidget {
+class WriterUploadScreen extends ConsumerStatefulWidget {
   const WriterUploadScreen({super.key});
 
   @override
-  State<WriterUploadScreen> createState() => _WriterUploadScreenState();
+  ConsumerState<WriterUploadScreen> createState() => _WriterUploadScreenState();
 }
 
-class _WriterUploadScreenState extends State<WriterUploadScreen> {
+class _WriterUploadScreenState extends ConsumerState<WriterUploadScreen> {
   bool _publishByChapters = true;
   bool _enableAutoTranslation = false;
   String _selectedGenre = 'Literary Fiction';
+  String? _pickedImagePath;
+
+  Future<void> _uploadCover() async {
+    final path = await ref.read(permissionServiceProvider).pickImageFromGallery();
+    if (path != null) {
+      setState(() {
+        _pickedImagePath = path;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,29 +96,42 @@ class _WriterUploadScreenState extends State<WriterUploadScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              height: 380,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A).withOpacity(0.3),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10, style: BorderStyle.solid),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_photo_alternate_outlined, color: Colors.white24, size: 40),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Click to upload cover',
-                    style: GoogleFonts.notoSerif(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Recommended 1600x2400px',
-                    style: GoogleFonts.inter(color: Colors.white24, fontSize: 11),
-                  ),
-                ],
+            GestureDetector(
+              onTap: _uploadCover,
+              child: Container(
+                width: double.infinity,
+                height: 380,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white10, style: BorderStyle.solid),
+                ),
+                child: _pickedImagePath != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.file(
+                          File(_pickedImagePath!),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: 380,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_photo_alternate_outlined, color: Colors.white24, size: 40),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Click to upload cover',
+                            style: GoogleFonts.notoSerif(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Recommended 1600x2400px',
+                            style: GoogleFonts.inter(color: Colors.white24, fontSize: 11),
+                          ),
+                        ],
+                      ),
               ),
             ),
 

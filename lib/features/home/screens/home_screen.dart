@@ -4,6 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../../../core/services/ad_service.dart';
+import '../../../core/providers/service_providers.dart';
+import '../../../core/utils/book_mapper.dart';
 import '../../../core/theme/app_colors.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -115,7 +119,13 @@ class HomeScreen extends ConsumerWidget {
                         isSmall: isSmallScreen,
                         headingFontSize: headingFontSize),
                     const SizedBox(height: 12),
-                    _buildRecentPicksList(context, isSmallScreen, isMediumScreen),
+                    _buildRecentPicksList(
+                        context, ref, isSmallScreen, isMediumScreen),
+
+                    SizedBox(height: sectionSpacing),
+
+                    // Google Mobile Ads - Test Banner
+                    const BookVistaBannerAd(),
 
                     SizedBox(height: sectionSpacing),
 
@@ -124,8 +134,8 @@ class HomeScreen extends ConsumerWidget {
                         isSmall: isSmallScreen,
                         headingFontSize: headingFontSize),
                     const SizedBox(height: 16),
-                    _buildTopHitsGrid(
-                        context, isSmallScreen, isMediumScreen, isLargeScreen),
+                    _buildTopHitsGrid(context, ref, isSmallScreen, isMediumScreen,
+                        isLargeScreen),
 
                     const SizedBox(height: 48),
 
@@ -344,50 +354,62 @@ class HomeScreen extends ConsumerWidget {
     ).animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.95, 0.95));
   }
 
-  Widget _buildRecentPicksList(
-      BuildContext context, bool isSmall, bool isMedium) {
-    final picks = [
-      {
-        'title': 'Shadow of the Wind',
-        'author': 'Carlos Ruiz Zafón',
-        'progress': 0.75,
-        'cover':
-            'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=300'
-      },
-      {
-        'title': 'Project Hail Mary',
-        'author': 'Andy Weir',
-        'progress': 0.25,
-        'cover':
-            'https://images.unsplash.com/photo-1589998059171-988d887df646?auto=format&fit=crop&q=80&w=300'
-      },
-      {
-        'title': 'Circe',
-        'author': 'Madeline Miller',
-        'progress': 0.5,
-        'cover':
-            'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=300'
-      },
-      {
-        'title': 'The Silent Patient',
-        'author': 'Alex Michaelides',
-        'progress': 0.9,
-        'cover':
-            'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=300'
-      },
-    ];
-
-    // Responsive card width and height
-    double cardWidth = isSmall ? 120 : (isMedium ? 140 : 160);
-    double listHeight = isSmall ? 210 : (isMedium ? 240 : 280);
-
+  Widget _buildBooksLoading(double height) {
     return SizedBox(
-      height: listHeight,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: picks.length,
-        itemBuilder: (context, index) {
-          final pick = picks[index];
+      height: height,
+      child: const Center(
+        child: CircularProgressIndicator(color: AppColors.accentDark),
+      ),
+    );
+  }
+
+  Widget _buildBooksMessage(double height, String message) {
+    return SizedBox(
+      height: height,
+      child: Center(
+        child: Text(
+          message,
+          style: GoogleFonts.inter(
+            color: AppColors.textPrimaryDark.withOpacity(0.5),
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentPicksList(
+      BuildContext context, WidgetRef ref, bool isSmall, bool isMedium) {
+    final cardWidth = isSmall ? 120.0 : (isMedium ? 140.0 : 160.0);
+    final listHeight = isSmall ? 210.0 : (isMedium ? 240.0 : 280.0);
+
+    final booksAsync = ref.watch(recommendedBooksProvider);
+
+    return booksAsync.when(
+      loading: () => _buildBooksLoading(listHeight),
+      error: (error, _) => _buildBooksMessage(
+        listHeight,
+        'Could not load recent picks.\nAdd books in Supabase.',
+      ),
+      data: (books) {
+        if (books.isEmpty) {
+          return _buildBooksMessage(
+            listHeight,
+            'No books in your Supabase `books` table yet.',
+          );
+        }
+
+        final picks =
+            books.map(toRecentPickMap).toList(growable: false);
+
+        return SizedBox(
+          height: listHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: picks.length,
+            itemBuilder: (context, index) {
+              final pick = picks[index];
           return GestureDetector(
             onTap: () => context.push('/reading'),
             child: Container(
@@ -471,109 +493,96 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
           );
-        },
-      ),
+            },
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildTopHitsGrid(BuildContext context, bool isSmall, bool isMedium,
-      bool isLarge) {
-    final hits = [
-      {
-        'title': 'Atomic Habits',
-        'author': 'James Clear',
-        'rank': 1,
-        'rating': 4.9,
-        'reviews': '2.4k',
-        'cover':
-            'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=300'
-      },
-      {
-        'title': 'The Alchemist',
-        'author': 'Paulo Coelho',
-        'rank': 2,
-        'rating': 4.8,
-        'reviews': '1.8k',
-        'cover':
-            'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=300'
-      },
-      {
-        'title': 'Dune',
-        'author': 'Frank Herbert',
-        'rank': 3,
-        'rating': 4.7,
-        'reviews': '5.1k',
-        'cover':
-            'https://images.unsplash.com/photo-1506466010722-395aa2bef877?auto=format&fit=crop&q=80&w=300'
-      },
-      {
-        'title': 'Normal People',
-        'author': 'Sally Rooney',
-        'rank': 4,
-        'rating': 4.5,
-        'reviews': '980',
-        'cover':
-            'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=300'
-      },
-    ];
+  Widget _buildTopHitsGrid(BuildContext context, WidgetRef ref, bool isSmall,
+      bool isMedium, bool isLarge) {
+    final coverWidth = isSmall ? 54.0 : (isMedium ? 64.0 : 74.0);
+    final coverHeight = isSmall ? 76.0 : (isMedium ? 90.0 : 104.0);
+    final itemPadding = isSmall ? 10.0 : (isMedium ? 12.0 : 14.0);
+    final titleFontSize = isSmall ? 13.0 : (isMedium ? 15.0 : 17.0);
+    final authorFontSize = isSmall ? 10.0 : (isMedium ? 11.0 : 13.0);
 
-    // Responsive cover image dimensions
-    double coverWidth = isSmall ? 54 : (isMedium ? 64 : 74);
-    double coverHeight = isSmall ? 76 : (isMedium ? 90 : 104);
+    final booksAsync = ref.watch(booksProvider);
 
-    // Responsive padding and font sizes
-    double itemPadding = isSmall ? 10 : (isMedium ? 12 : 14);
-    double titleFontSize = isSmall ? 13 : (isMedium ? 15 : 17);
-    double authorFontSize = isSmall ? 10 : (isMedium ? 11 : 13);
-
-    // For larger screens, we could use a grid layout
-    if (isLarge) {
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 2.5,
+    return booksAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.accentDark),
         ),
-        itemCount: hits.length,
-        itemBuilder: (context, index) {
-          final hit = hits[index];
-          return _buildTopHitCard(
-            context,
-            hit,
-            coverWidth,
-            coverHeight,
-            itemPadding,
-            titleFontSize,
-            authorFontSize,
+      ),
+      error: (error, _) => _buildBooksMessage(
+        120,
+        'Could not load top books from Supabase.',
+      ),
+      data: (books) {
+        if (books.isEmpty) {
+          return _buildBooksMessage(
+            120,
+            'No books found. Seed your `books` table in Supabase.',
           );
-        },
-      );
-    } else {
-      // List view for small and medium screens
-      return ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: hits.length,
-        itemBuilder: (context, index) {
-          final hit = hits[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildTopHitCard(
-              context,
-              hit,
-              coverWidth,
-              coverHeight,
-              itemPadding,
-              titleFontSize,
-              authorFontSize,
+        }
+
+        final hits = books
+            .take(8)
+            .toList()
+            .asMap()
+            .entries
+            .map((e) => toTopHitMap(e.value, e.key + 1))
+            .toList();
+
+        if (isLarge) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 2.5,
             ),
+            itemCount: hits.length,
+            itemBuilder: (context, index) {
+              return _buildTopHitCard(
+                context,
+                hits[index],
+                coverWidth,
+                coverHeight,
+                itemPadding,
+                titleFontSize,
+                authorFontSize,
+              );
+            },
           );
-        },
-      );
-    }
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: hits.length,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildTopHitCard(
+                context,
+                hits[index],
+                coverWidth,
+                coverHeight,
+                itemPadding,
+                titleFontSize,
+                authorFontSize,
+              ),
+            );
+          },
+        );
+      },
+    );
   }
   Widget _buildTopHitCard(BuildContext context, Map<String, dynamic> hit, double coverWidth,
       double coverHeight, double itemPadding, double titleFontSize, double authorFontSize) {
@@ -674,6 +683,64 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class BookVistaBannerAd extends ConsumerStatefulWidget {
+  const BookVistaBannerAd({super.key});
+
+  @override
+  ConsumerState<BookVistaBannerAd> createState() => _BookVistaBannerAdState();
+}
+
+class _BookVistaBannerAdState extends ConsumerState<BookVistaBannerAd> {
+  BannerAd? _bannerAd;
+  bool _isAdLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAd();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  void _loadAd() {
+    final banner = ref.read(adServiceProvider).loadBannerAd(
+      size: AdSize.banner,
+      onAdLoaded: (ad) {
+        if (mounted) {
+          setState(() {
+            _isAdLoaded = true;
+          });
+        }
+      },
+      onAdFailedToLoad: (ad, error) {
+        // Handled in ad service logs
+      },
+    );
+    if (banner == null) return;
+    _bannerAd = banner;
+    _bannerAd!.load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isAdLoaded || _bannerAd == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      alignment: Alignment.center,
+      width: _bannerAd!.size.width.toDouble(),
+      height: _bannerAd!.size.height.toDouble(),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: AdWidget(ad: _bannerAd!),
     );
   }
 }

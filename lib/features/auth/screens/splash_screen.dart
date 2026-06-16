@@ -20,7 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Animate the progress bar
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       setState(() {
@@ -29,8 +29,12 @@ class _SplashScreenState extends State<SplashScreen> {
         } else {
           _timer.cancel();
           if (!mounted) return;
-          final hasSession =
-              Supabase.instance.client.auth.currentSession != null;
+          bool hasSession = false;
+          try {
+            hasSession = Supabase.instance.client.auth.currentSession != null;
+          } catch (_) {
+            hasSession = false;
+          }
           context.go(hasSession ? '/home' : '/onboarding');
         }
       });
@@ -55,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
               painter: DotGridPainter(),
             ),
           ),
-          
+
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -68,8 +72,11 @@ class _SplashScreenState extends State<SplashScreen> {
                       Icons.coffee,
                       size: 42,
                       color: Color(0xFFFBBF24), // Amber/Yellow
-                    ).animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.8, 0.8)),
-                    
+                    )
+                        .animate()
+                        .fadeIn(duration: 800.ms)
+                        .scale(begin: const Offset(0.8, 0.8)),
+
                     // Subtle Steam line
                     Positioned(
                       top: -15,
@@ -86,15 +93,16 @@ class _SplashScreenState extends State<SplashScreen> {
                             ],
                           ),
                         ),
-                      ).animate(onPlay: (c) => c.repeat())
-                       .moveY(begin: 5, end: -15, duration: 1500.ms)
-                       .fadeOut(),
+                      )
+                          .animate(onPlay: (c) => c.repeat())
+                          .moveY(begin: 5, end: -15, duration: 1500.ms)
+                          .fadeOut(),
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // BookVista Title
                 Text(
                   'BookVista',
@@ -108,10 +116,13 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                     ],
                   ),
-                ).animate().fadeIn(duration: 1000.ms, delay: 200.ms).moveY(begin: 10, end: 0),
-                
+                )
+                    .animate()
+                    .fadeIn(duration: 1000.ms, delay: 200.ms)
+                    .moveY(begin: 10, end: 0),
+
                 const SizedBox(height: 16),
-                
+
                 // Tagline
                 Text(
                   'Brew your next chapter',
@@ -121,9 +132,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     fontStyle: FontStyle.italic,
                   ),
                 ).animate().fadeIn(duration: 1000.ms, delay: 600.ms),
-                
+
                 const SizedBox(height: 80),
-                
+
                 // Progress Bar Container
                 SizedBox(
                   width: 200,
@@ -134,7 +145,8 @@ class _SplashScreenState extends State<SplashScreen> {
                         child: LinearProgressIndicator(
                           value: _progress,
                           backgroundColor: Colors.white.withOpacity(0.05),
-                          valueColor: const AlwaysStoppedAnimation(Color(0xFFFBBF24)),
+                          valueColor:
+                              const AlwaysStoppedAnimation(Color(0xFFFBBF24)),
                           minHeight: 2,
                         ),
                       ),
@@ -147,15 +159,16 @@ class _SplashScreenState extends State<SplashScreen> {
                           fontWeight: FontWeight.w500,
                           letterSpacing: 4,
                         ),
-                      ).animate(onPlay: (c) => c.repeat(reverse: true))
-                       .fadeIn(duration: 1000.ms),
+                      )
+                          .animate(onPlay: (c) => c.repeat(reverse: true))
+                          .fadeIn(duration: 1000.ms),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          
+
           // Footer
           Positioned(
             bottom: 40,
@@ -166,11 +179,23 @@ class _SplashScreenState extends State<SplashScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(width: 4, height: 4, decoration: const BoxDecoration(color: Color(0xFF422006), shape: BoxShape.circle)),
+                    Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF422006), shape: BoxShape.circle)),
                     const SizedBox(width: 8),
-                    Container(width: 4, height: 4, decoration: const BoxDecoration(color: Color(0xFFFBBF24), shape: BoxShape.circle)),
+                    Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFFBBF24), shape: BoxShape.circle)),
                     const SizedBox(width: 8),
-                    Container(width: 4, height: 4, decoration: const BoxDecoration(color: Color(0xFF422006), shape: BoxShape.circle)),
+                    Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF422006), shape: BoxShape.circle)),
                   ],
                 ),
                 const SizedBox(height: 12),
